@@ -19,7 +19,9 @@ package com.spotify.scio.io
 
 import java.util.UUID
 
+import com.google.protobuf.ByteString
 import org.apache.commons.io.FileUtils
+import org.tensorflow.example._
 
 class TFTapTest extends TapSpec {
 
@@ -38,6 +40,36 @@ class TFTapTest extends TapSpec {
       verifyTap(t.map(new String(_)), data.toSet)
       FileUtils.deleteDirectory(dir)
     }
+  }
+
+  it should "support saveAsTfExampleFile" in {
+    import com.spotify.scio.tensorflow._
+    val wordCount = Seq((1.0F, 2.0F), (5.0F, 3.0F))
+    val examples = wordCount.map { kv =>
+      Example.newBuilder().setFeatures(Features.newBuilder()
+        .putFeature("f1", Feature.newBuilder()
+          .setFloatList(FloatList.newBuilder().addValue(kv._1)).build())
+        .putFeature("f2", Feature.newBuilder()
+          .setFloatList(FloatList.newBuilder().addValue(kv._2)).build())
+      ).build()
+    }
+    import org.apache.beam.sdk.io.TFRecordIO.{CompressionType => CType}
+    for (compressionType <- Seq(CType.NONE, CType.ZLIB, CType.GZIP)) {
+      val dir = tmpDir
+      val t = runWithFileFuture { sc =>
+        val featureSpec = sc.parallelize(Seq(Seq("word", "count")))
+        val (a, _) = sc.parallelize(examples)
+          .saveAsTfExampleFile(dir.getPath, featureSpec, compressionType = compressionType)
+        a
+      }
+      verifyTap(t.map { e =>
+        val f1 = e.getFeatures.getFeatureMap.get("f1")
+        val f2 = e.getFeatures.getFeatureMap.get("f2")
+        (f1.getFloatList.getValue(0), f2.getFloatList.getValue(0))
+      }, wordCount.toSet)
+      FileUtils.deleteDirectory(dir)
+    }
+
   }
 
 }

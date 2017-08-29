@@ -143,7 +143,7 @@ class TFExampleSCollectionFunctions[T <: Example](val self: SCollection[T]) {
     *
     * @group output
     */
-  def saveAsTFExampleFile(path: String,
+  def saveAsTfExampleFile(path: String,
                           featureSpec: SCollection[Seq[String]],
                           suffix: String = ".tfrecords",
                           compressionType: CompressionType = CompressionType.NONE,
@@ -169,6 +169,7 @@ class TFExampleSCollectionFunctions[T <: Example](val self: SCollection[T]) {
         writer.close()
       }
     }
+    import scala.concurrent.ExecutionContext.Implicits.global
     val featureSpecFuture = Future(TextTap(_featureSpecPath))
     if (self.context.isTest) {
       self.context.testOut(TFExampleIO(path))(self.asInstanceOf[SCollection[Example]])

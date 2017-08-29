@@ -47,4 +47,8 @@ package object tensorflow {
   /** Implicit conversion from [[FileStorage]] to [[TFFileStorageFunctions]]. */
   implicit def makeTFFileStorageFunctions(s: FileStorage): TFFileStorageFunctions =
     new TFFileStorageFunctions(s)
+
+  /** Implicit conversion from [[SCollection]] to [[TFExampleSCollectionFunctions]]. */
+  implicit def makeTFExampleSCollectionFunctions[T <: Example](s: SCollection[T])
+  : TFExampleSCollectionFunctions[T] = new TFExampleSCollectionFunctions(s)
 }

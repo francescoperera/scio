@@ -18,20 +18,25 @@
 import java.util.UUID
 
 import com.spotify.scio._
-import com.spotify.scio.hollow.{HollowKVWriter, HollowStorage}
+import com.spotify.scio.hollow.{HollowKVReader, HollowKVWriter, HollowStorage}
 import org.apache.beam.sdk.transforms.{DoFn, ParDo}
 import org.apache.beam.sdk.transforms.DoFn.ProcessElement
 
 object HollowTest {
+  val path = "gs://scio-playground-us/hollow-100m"
+}
+
+object HollowWriteTest {
   def main(argz: Array[String]): Unit = {
     val (sc, args) = ContextAndArgs(argz)
 
     val n = args.int("n")
     val m = args.long("m")
-    val out = args("out")
+    val ids = args("ids")
+    val out = HollowTest.path
 
-    sc.parallelize(Seq.fill(n)(m))
-      .applyTransform(ParDo.of(new UUIDDoFn))
+    val kvs = sc.parallelize(Seq.fill(n)(m)).applyTransform(ParDo.of(new UUIDDoFn))
+    kvs
       .groupBy(_ => ())
       .map { case (_, xs) =>
         val storage = HollowStorage.forFs(out)
@@ -39,6 +44,27 @@ object HollowTest {
         writer.write(xs.iterator.map(kv => (kv._1.getBytes, kv._2.getBytes)))
         ()
       }
+    kvs.keys.saveAsTextFile(ids)
+    sc.close()
+  }
+}
+
+object HollowReadTest {
+
+  val reader = new HollowKVReader(HollowStorage.forFs(HollowTest.path))
+
+  def main(argz: Array[String]): Unit = {
+    val (sc, args) = ContextAndArgs(argz)
+
+    val ids = args("ids")
+    val out = args("out")
+
+    sc.textFile(ids)
+      .map { id =>
+        s"$id\t${Option(reader.getString(id)).getOrElse("null")}"
+      }
+      .saveAsTextFile(out)
+
     sc.close()
   }
 }
